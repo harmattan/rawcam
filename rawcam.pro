@@ -14,9 +14,15 @@ LIBS += -lpthread -L../.. -ljpeg -lFCam
 MOBILITY += sensors
 
 HEADERS += OverlayWidget.h CameraThread.h ExampleOverlayWidget.h \
-    myproximitysensor.h
+    myproximitysensor.h \
+    CameraParameters.h \
+    LEDBlinker.h \
+    dot.h
 SOURCES += rawcam.cpp OverlayWidget.cpp CameraThread.cpp ExampleOverlayWidget.cpp \
-    myproximitysensor.cpp
+    myproximitysensor.cpp \
+    CameraParameters.cpp \
+    LEDBlinker.cpp \
+    dot.cpp
 
 
 
@@ -41,7 +47,7 @@ INSTALLS    += style
 style.path  = /opt/rawcam/
 style.files  = style.css \
                icon.png \
-               helpBg.png shutter.png
+               helpBg.png shutter.png halftone.png spot.png spotGrey.png
 
 
 #

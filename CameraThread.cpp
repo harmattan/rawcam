@@ -2,6 +2,7 @@
 
 #include <qmetatype.h>
 #include "CameraThread.h"
+#include <QDebug>
 
 #include <FCam/N9.h>
 
@@ -9,6 +10,8 @@
 #include <iostream>
 
 #include "OverlayWidget.h"
+#include "CameraParameters.h"
+//#include "LEDBlinker.h"
 
 using namespace std;
 
@@ -37,7 +40,7 @@ void CameraThread::run() {
 
     // The viewfinder shot
     FCam::Shot viewfinder;
-    viewfinder.exposure = 40000;
+    viewfinder.exposure = int(parameters->exposure.value * 1000000 + 0.5);
     viewfinder.gain = 1.0f;
     // run at 25 fps
     viewfinder.frameTime = 40000;
@@ -57,14 +60,27 @@ void CameraThread::run() {
     FCam::Shot photo;
     photo.image = FCam::Image(sensor.maxImageSize(), FCam::RAW, FCam::Image::AutoAllocate);
     
+
+//    LEDBlinker blinker;
+//    LEDBlinker::BlinkAction blink(&blinker);
+
     while (keepGoing) {
 	while (active) {
     		// stream the viewfinder
     		sensor.stream(viewfinder);
-		if (focus && autoFocus.idle()) { 
+        if (focus && autoFocus.idle() && parameters->focus.mode == parameters->focus.AUTO) {
 			autoFocus.startSweep();
 			focus = false;
-		}
+        } else if (parameters->focus.mode == parameters->focus.MANUAL){
+            lens.setFocus(parameters->focus.value, lens.maxFocusSpeed());
+        } else if (focus && parameters->focus.mode == parameters->focus.SPOT) {
+            int x = parameters->focus.spot.x();
+            int y = parameters->focus.spot.y();
+//            qDebug()<<"Setting target to " << x << y;
+            autoFocus.setTarget(FCam::Rect(x-15, y-15, 30, 30));
+            autoFocus.startSweep();
+            focus = false;
+        }
 		
 		// Take a picture once autofocus completes and we have space to store the frame
 		if (takeSnapshot && autoFocus.idle() && writer.savesPending() < 8) {
@@ -106,11 +122,20 @@ void CameraThread::run() {
 		    } else if (f.shot().id == viewfinder.id) {
 
 			// update the autofocus and metering algorithms
-			autoFocus.update(f);
-			autoExpose(&viewfinder, f, 88);
-			autoWhiteBalance(&viewfinder, f);
-			sensor.stream(viewfinder);
+            autoFocus.update(f);
 
+            if (parameters->exposure.mode == parameters->exposure.AUTO) autoExpose(&viewfinder, f, 88);
+            else viewfinder.exposure = int(parameters->exposure.value * 1000000 + 0.5);
+			autoWhiteBalance(&viewfinder, f);
+            sensor.stream(viewfinder);
+            QString humanReadableExposure;
+            if (viewfinder.exposure >= 1000000) {
+                humanReadableExposure = QString::number(viewfinder.exposure /1000000) + "s";
+            } else {
+                humanReadableExposure = "1/" + QString::number(1000000 / (viewfinder.exposure));
+            }
+            emit exposureInfo(humanReadableExposure);
+//            viewfinder.addAction(blink); //blink doesn't seem to work, must look into it
 			emit newViewfinderFrame();
 		    } else {
 			printf("got some other frame\n");
